@@ -1,0 +1,894 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Amazon P&L Reconciliation — D'Chica</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --navy:#1F4E79;--orange:#FF6900;--gold:#F59E0B;
+  --green:#16a34a;--red:#dc2626;--bg:#F0F4F8;
+  --card:#fff;--border:#E2E8F0;--text:#1E293B;--muted:#64748B;
+}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);font-size:13px}
+
+.header{background:linear-gradient(135deg,#1F4E79,#0F2940);padding:0 20px;height:54px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:0 2px 10px rgba(0,0,0,.25)}
+.logo{font-size:17px;font-weight:800;color:#fff;letter-spacing:-.3px}
+.logo span{color:#FF6900}
+.hdr-sub{font-size:11px;color:rgba(255,255,255,.45);margin-left:10px}
+.hdr-right{font-size:11px;color:rgba(255,255,255,.4)}
+
+/* UPLOAD */
+.upload-wrap{max-width:860px;margin:36px auto;padding:0 20px}
+.upload-hero{text-align:center;margin-bottom:28px}
+.upload-hero h2{font-size:22px;font-weight:800;color:var(--navy);margin-bottom:6px}
+.upload-hero p{color:var(--muted);font-size:13px}
+.amz-logo{background:#FF6900;color:#fff;font-size:11px;font-weight:800;padding:3px 8px;border-radius:4px;letter-spacing:.5px;margin-right:6px}
+
+.file-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px}
+.fc{background:var(--card);border:2px dashed var(--border);border-radius:12px;padding:16px;cursor:pointer;transition:all .2s;position:relative}
+.fc:hover{border-color:#FF6900;background:#FFF5EE}
+.fc.loaded{border-style:solid;border-color:var(--green);background:#F0FDF4}
+.fc input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.fc-icon{font-size:22px;margin-bottom:8px}
+.fc-label{font-weight:700;font-size:12px;color:var(--navy);margin-bottom:3px}
+.fc-desc{font-size:11px;color:var(--muted);line-height:1.5}
+.fc-status{font-size:11px;margin-top:8px;font-weight:600;color:var(--muted)}
+.fc-status.ok{color:var(--green)}
+.br{background:var(--navy);color:#fff;font-size:9px;padding:2px 6px;border-radius:8px;margin-left:4px}
+.bo{background:#e2e8f0;color:var(--muted);font-size:9px;padding:2px 6px;border-radius:8px;margin-left:4px}
+
+.run-btn{width:100%;padding:14px;background:#FF6900;color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:800;cursor:pointer;transition:all .2s;letter-spacing:.3px}
+.run-btn:hover:not(:disabled){background:#e05d00;transform:translateY(-1px);box-shadow:0 4px 12px rgba(255,105,0,.3)}
+.run-btn:disabled{background:#CBD5E1;cursor:not-allowed}
+.run-note{text-align:center;font-size:11px;color:var(--muted);margin-top:10px}
+
+/* TOOL */
+.tool{display:none}
+.tabs{background:var(--card);border-bottom:2px solid var(--border);display:flex;padding:0 16px;gap:2px;position:sticky;top:54px;z-index:90;overflow-x:auto}
+.tab{padding:11px 15px;cursor:pointer;font-size:12px;font-weight:600;color:var(--muted);border-bottom:3px solid transparent;margin-bottom:-2px;white-space:nowrap}
+.tab.active{color:var(--navy);border-bottom-color:#FF6900}
+.tab:hover{color:var(--navy)}
+.tb{background:#FF6900;color:#fff;font-size:9px;padding:1px 5px;border-radius:8px;margin-left:4px}
+
+.content{padding:16px;max-width:1400px;margin:0 auto}
+
+/* CARDS */
+.krow{display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:10px;margin-bottom:14px}
+.kc{background:var(--card);border-radius:10px;padding:14px;border-left:4px solid var(--navy);box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.kc.g{border-left-color:var(--green)}.kc.r{border-left-color:var(--red)}.kc.o{border-left-color:#FF6900}.kc.gold{border-left-color:var(--gold)}.kc.p{border-left-color:#7C3AED}
+.kl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px}
+.kv{font-size:19px;font-weight:800;color:var(--navy);line-height:1}
+.kc.g .kv{color:var(--green)}.kc.r .kv{color:var(--red)}.kc.o .kv{color:#FF6900}.kc.gold .kv{color:var(--gold)}.kc.p .kv{color:#7C3AED}
+.ks{font-size:10px;color:var(--muted);margin-top:3px}
+
+.shdr{font-size:13px;font-weight:700;color:var(--navy);margin:14px 0 8px;display:flex;align-items:center;gap:6px}
+.shdr::before{content:'';display:block;width:4px;height:16px;background:#FF6900;border-radius:2px}
+
+.panel{background:var(--card);border-radius:10px;box-shadow:0 1px 3px rgba(0,0,0,.06);overflow:hidden;margin-bottom:14px}
+.ph{background:var(--navy);color:#fff;padding:10px 14px;font-size:12px;font-weight:700}
+.pb{padding:14px}
+.srow{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #F1F5F9;font-size:12px}
+.srow:last-child{border:none;font-weight:700;font-size:14px;padding-top:8px}
+.sg{color:var(--green)}.sr{color:var(--red)}
+
+/* P&L WATERFALL */
+.wf{display:flex;flex-direction:column;gap:0}
+.wf-row{display:flex;justify-content:space-between;align-items:center;padding:8px 14px;border-bottom:1px solid #F8FAFC;font-size:12px}
+.wf-row.total{background:#EFF6FF;font-weight:700;font-size:14px;border-radius:6px;margin:4px 0}
+.wf-row.subtotal{background:#F0FDF4;font-weight:600}
+.wf-row.deduct{background:#FFF8F5}
+.wf-row.final{background:linear-gradient(135deg,#1F4E79,#0F2940);color:#fff;font-weight:800;font-size:16px;border-radius:8px;margin-top:8px;padding:14px}
+.wf-label{display:flex;align-items:center;gap:8px}
+.wf-dot{width:10px;height:10px;border-radius:50%}
+
+/* TABLE */
+.tw{background:var(--card);border-radius:10px;box-shadow:0 1px 3px rgba(0,0,0,.06);overflow:hidden;margin-bottom:14px}
+.ttb{padding:10px 12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:#F8FAFC;border-bottom:1px solid var(--border)}
+.ttb input,.ttb select{padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;outline:none;background:#fff}
+.ttb input{width:210px}
+.tcnt{margin-left:auto;font-size:11px;color:var(--muted);font-weight:600}
+.ts{max-height:420px;overflow-y:auto}
+table{width:100%;border-collapse:collapse;font-size:11px}
+th{background:var(--navy);color:#fff;padding:8px 10px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;white-space:nowrap;position:sticky;top:0;z-index:5}
+td{padding:7px 10px;border-bottom:1px solid #F1F5F9;white-space:nowrap}
+tr:nth-child(even) td{background:#F8FAFC}
+tr:hover td{background:#EFF6FF}
+.r{text-align:right}.c{text-align:center}
+.pgr{padding:8px 14px;font-size:11px;color:var(--muted);text-align:center;display:flex;justify-content:center;gap:8px;align-items:center}
+.pgr button{padding:4px 10px;border:1px solid var(--border);border-radius:5px;background:#fff;cursor:pointer;font-size:11px}
+.pgr button:disabled{opacity:.4}
+
+.b{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700}
+.bg{background:#DCFCE7;color:#15803D}.br2{background:#FEE2E2;color:#B91C1C}
+.by{background:#FEF9C3;color:#854D0E}.bb{background:#DBEAFE;color:#1D4ED8}
+.bgr{background:#F1F5F9;color:#475569}.bo2{background:#FFEDD5;color:#C2410C}
+.bp{background:#EDE9FE;color:#5B21B6}
+
+.alert{padding:10px 14px;border-radius:8px;font-size:12px;margin-bottom:8px;border-left:4px solid}
+.al-r{background:#FFF1F2;border-color:var(--red)}.al-y{background:#FEFCE8;border-color:var(--gold)}
+.al-g{background:#F0FDF4;border-color:var(--green)}.al-b{background:#EFF6FF;border-color:#3B82F6}
+.al-o{background:#FFF5EE;border-color:#FF6900}
+
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:600px){.file-grid,.g2{grid-template-columns:1fr}.krow{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div style="display:flex;align-items:center">
+    <div class="logo">D'<span>Chica</span></div>
+    <span class="amz-logo" style="margin-left:12px">amazon</span>
+    <span class="hdr-sub">P&L Reconciliation Tool</span>
+  </div>
+  <div class="hdr-right" id="hdr-info">Upload files to begin</div>
+</div>
+
+<!-- UPLOAD -->
+<div class="upload-wrap" id="upload-screen">
+  <div class="upload-hero">
+    <h2><span class="amz-logo">amazon</span> P&L Reconciliation Tool</h2>
+    <p>Files upload karo — tool khud Orders, Settlement, Returns, Ads, Coupons match karega aur real Profit/Loss dikhayega</p>
+  </div>
+
+  <div class="file-grid">
+    <div class="fc" id="card-order">
+      <input type="file" accept=".xlsx,.xls,.csv,.txt,.tsv" onchange="loadFile('order',this)">
+      <div class="fc-icon">📦</div>
+      <div class="fc-label">Order / Sale Report <span class="br">Required</span></div>
+      <div class="fc-desc">Seller Central → Reports → Business Reports → Orders<br>Fields: Order ID, SKU, ASIN, Qty, Sale Amount, Status, Date</div>
+      <div class="fc-status" id="st-order">⬆ Click to upload</div>
+    </div>
+
+    <div class="fc" id="card-settle">
+      <input type="file" accept=".xlsx,.xls,.csv,.txt,.tsv" onchange="loadFile('settle',this)">
+      <div class="fc-icon">💰</div>
+      <div class="fc-label">Settlement Report <span class="br">Required</span></div>
+      <div class="fc-desc">Seller Central → Reports → Payments → All Statements<br>Fields: Order ID, Product Sales, Amazon Fee, FBA Fee, Net Settlement</div>
+      <div class="fc-status" id="st-settle">⬆ Click to upload</div>
+    </div>
+
+    <div class="fc" id="card-returns">
+      <input type="file" accept=".xlsx,.xls,.csv,.txt,.tsv" onchange="loadFile('returns',this)">
+      <div class="fc-icon">↩️</div>
+      <div class="fc-label">Returns Report <span class="bo">Optional</span></div>
+      <div class="fc-desc">Seller Central → Reports → Fulfillment → Returns<br>Fields: Order ID, SKU, Return Qty, Return Reason, Refund Amount</div>
+      <div class="fc-status" id="st-returns">⬆ Click to upload</div>
+    </div>
+
+    <div class="fc" id="card-ads">
+      <input type="file" accept=".xlsx,.xls,.csv,.txt,.tsv" onchange="loadFile('ads',this)">
+      <div class="fc-icon">📢</div>
+      <div class="fc-label">Ads / Advertising Report <span class="bo">Optional</span></div>
+      <div class="fc-desc">Seller Central → Advertising → Campaign Manager → Download<br>Fields: Campaign, SKU/ASIN, Spend, Impressions, Clicks, ACOS</div>
+      <div class="fc-status" id="st-ads">⬆ Click to upload</div>
+    </div>
+
+    <div class="fc" id="card-coupon">
+      <input type="file" accept=".xlsx,.xls,.csv,.txt,.tsv" onchange="loadFile('coupon',this)">
+      <div class="fc-icon">🎟️</div>
+      <div class="fc-label">Coupon / Promo Report <span class="bo">Optional</span></div>
+      <div class="fc-desc">Seller Central → Promotions → Coupons → Download<br>Fields: Coupon ID, SKU, Discount Amount, Redemptions</div>
+      <div class="fc-status" id="st-coupon">⬆ Click to upload</div>
+    </div>
+
+    <div class="fc" id="card-cost">
+      <input type="file" accept=".xlsx,.xls,.csv,.txt,.tsv" onchange="loadFile('cost',this)">
+      <div class="fc-icon">💹</div>
+      <div class="fc-label">Costing Sheet <span class="bo">Optional</span></div>
+      <div class="fc-desc">D'Chica internal file — SKU + Cost Price per unit<br>Profit = Net Settlement − COGS − Ads − Coupon</div>
+      <div class="fc-status" id="st-cost">⬆ Click to upload</div>
+    </div>
+  </div>
+
+  <button class="run-btn" id="run-btn" onclick="runRecon()" disabled>
+    🔄 Run P&L Reconciliation
+  </button>
+  <div class="run-note">Order Report + Settlement Report required. Baaki optional hain lekin profit accurate hoga.</div>
+</div>
+
+<!-- TOOL -->
+<div class="tool" id="tool">
+  <div class="tabs">
+    <div class="tab active" onclick="showTab('pl',this)">📊 P&L Summary</div>
+    <div class="tab" onclick="showTab('orders',this)">📦 Orders <span class="tb" id="tb-ord">0</span></div>
+    <div class="tab" onclick="showTab('settle',this)">💰 Settlement</div>
+    <div class="tab" onclick="showTab('returns',this)">↩️ Returns <span class="tb" id="tb-ret">0</span></div>
+    <div class="tab" onclick="showTab('ads',this)">📢 Ads <span class="tb" id="tb-ads">0</span></div>
+    <div class="tab" onclick="showTab('sku',this)">📋 SKU P&L</div>
+    <div class="tab" onclick="showTab('recon',this)">🔗 Recon Match <span class="tb" id="tb-recon">0</span></div>
+    <div class="tab" onclick="showTab('upload',this)">⬆ New Files</div>
+  </div>
+
+  <div class="content">
+    <div id="pane-pl"></div>
+    <div id="pane-orders" style="display:none"></div>
+    <div id="pane-settle" style="display:none"></div>
+    <div id="pane-returns" style="display:none"></div>
+    <div id="pane-ads" style="display:none"></div>
+    <div id="pane-sku" style="display:none"></div>
+    <div id="pane-recon" style="display:none"></div>
+    <div id="pane-upload" style="display:none">
+      <button onclick="resetTool()" style="background:var(--navy);color:#fff;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-weight:600;margin-bottom:16px">← Upload New Files</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const FILES={order:null,settle:null,returns:null,ads:null,coupon:null,cost:null};
+let DATA={}, PG={orders:0,returns:0,ads:0,sku:0,recon:0};
+const PER=100;
+
+function parseFile(file){
+  return new Promise((res,rej)=>{
+    const r=new FileReader();
+    const isTSV=file.name.endsWith('.tsv')||file.name.endsWith('.txt');
+    r.onload=e=>{
+      try{
+        if(isTSV){
+          const lines=e.target.result.split('\n').filter(l=>l.trim());
+          const hdrs=lines[0].split('\t');
+          const rows=lines.slice(1).map(l=>{
+            const vals=l.split('\t');
+            const obj={};
+            hdrs.forEach((h,i)=>obj[h.trim()]=vals[i]?.trim()||'');
+            return obj;
+          }).filter(r=>Object.values(r).some(v=>v));
+          res(rows);
+        } else {
+          const wb=XLSX.read(e.target.result,{type:'binary',cellDates:true});
+          const ws=wb.Sheets[wb.SheetNames[0]];
+          res(XLSX.utils.sheet_to_json(ws,{defval:''}));
+        }
+      }catch(err){rej(err)}
+    };
+    isTSV?r.readAsText(file):r.readAsBinaryString(file);
+  });
+}
+
+async function loadFile(key,input){
+  const file=input.files[0]; if(!file) return;
+  const st=document.getElementById('st-'+key);
+  const card=document.getElementById('card-'+key);
+  st.textContent='⏳ Loading...'; st.className='fc-status';
+  try{
+    FILES[key]=await parseFile(file);
+    st.textContent=`✅ ${file.name} (${FILES[key].length} rows)`;
+    st.className='fc-status ok'; card.classList.add('loaded');
+  }catch(e){st.textContent='❌ Error — check file format'; st.className='fc-status'}
+  document.getElementById('run-btn').disabled=!(FILES.order&&FILES.settle);
+}
+
+function col(row,...keys){
+  for(const k of keys){const v=row[k]; if(v!==undefined&&v!=='') return v;}
+  return null;
+}
+function fnum(v){const n=parseFloat(String(v).replace(/[,₹$]/g,''));return isNaN(n)?0:n;}
+function inr(v,showSign=false){
+  if(v===null||v===undefined) return '—';
+  const n=parseFloat(v);
+  if(isNaN(n)) return '—';
+  const s='₹'+Math.abs(n).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
+  if(showSign&&n<0) return '-'+s;
+  return s;
+}
+function clr(v,inv=false){
+  const n=parseFloat(v);
+  if(isNaN(n)) return '';
+  const pos=inv?(n<0):(n>0);
+  return pos?'color:var(--green)':'color:var(--red)';
+}
+function fmt(v,type){
+  if(!v||v==='') return '—';
+  if(type==='date'){try{const d=new Date(v);return isNaN(d)?String(v).slice(0,10):d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});}catch{return String(v).slice(0,10);}}
+  return v;
+}
+function b(text,cls){if(!text||text==='—') return '<span style="color:#94a3b8">—</span>'; return `<span class="b ${cls}">${text}</span>`;}
+
+function runRecon(){
+  const order=FILES.order||[], settle=FILES.settle||[];
+  const returns=FILES.returns||[], ads=FILES.ads||[], coupon=FILES.coupon||[], cost=FILES.cost||[];
+
+  // ── Detect order columns
+  const oRow=order[0]||{};
+  const oOID=Object.keys(oRow).find(k=>/order.?id|order.?number/i.test(k))||'order-id';
+  const oSKU=Object.keys(oRow).find(k=>/seller.?sku|sku|msku/i.test(k))||'sku';
+  const oASIN=Object.keys(oRow).find(k=>/^asin$/i.test(k))||'asin';
+  const oQty=Object.keys(oRow).find(k=>/quantity|qty/i.test(k))||'quantity';
+  const oAmt=Object.keys(oRow).find(k=>/item.?price|sale.?amount|product.?sales|amount/i.test(k))||'item-price';
+  const oDate=Object.keys(oRow).find(k=>/purchase|order.?date|date/i.test(k))||'purchase-date';
+  const oStatus=Object.keys(oRow).find(k=>/status/i.test(k))||'order-status';
+  const oState=Object.keys(oRow).find(k=>/ship.?state|state/i.test(k))||'ship-state';
+
+  // ── Detect settlement columns
+  const sRow=settle[0]||{};
+  const sOID=Object.keys(sRow).find(k=>/order.?id/i.test(k))||'order id';
+  const sSKU=Object.keys(sRow).find(k=>/sku|seller.?sku/i.test(k))||'sku';
+  const sAmt=Object.keys(sRow).find(k=>/product.?sales|sale.?amount|amount/i.test(k))||'product sales';
+  const sFee=Object.keys(sRow).find(k=>/amazon.?fee|referral|commission/i.test(k))||'selling fees';
+  const sFBA=Object.keys(sRow).find(k=>/fba|fulfillment.?fee/i.test(k))||'fba fees';
+  const sShip=Object.keys(sRow).find(k=>/ship|delivery/i.test(k)&&!/state/i.test(k))||'';
+  const sNet=Object.keys(sRow).find(k=>/net|total|settlement/i.test(k))||'total';
+  const sDate=Object.keys(sRow).find(k=>/date|posted/i.test(k))||'date/time';
+
+  // ── Detect ads columns
+  const aRow=ads[0]||{};
+  const aSKU=Object.keys(aRow).find(k=>/sku|asin/i.test(k))||'Advertised SKU';
+  const aSpend=Object.keys(aRow).find(k=>/spend|cost/i.test(k))||'Spend';
+  const aImp=Object.keys(aRow).find(k=>/impression/i.test(k))||'Impressions';
+  const aClk=Object.keys(aRow).find(k=>/click/i.test(k))||'Clicks';
+  const aSales=Object.keys(aRow).find(k=>/sales|revenue/i.test(k))||'7 Day Total Sales';
+  const aCamp=Object.keys(aRow).find(k=>/campaign/i.test(k))||'Campaign Name';
+
+  // ── Detect coupon columns
+  const cRow=coupon[0]||{};
+  const cSKU=Object.keys(cRow).find(k=>/sku|asin/i.test(k))||'ASIN';
+  const cDisc=Object.keys(cRow).find(k=>/discount|amount|savings/i.test(k))||'Discount';
+  const cRedem=Object.keys(cRow).find(k=>/redemp|used|count/i.test(k))||'Redemptions';
+
+  // ── Detect cost columns
+  const costMap={};
+  cost.forEach(r=>{
+    const keys=Object.keys(r);
+    const skuKey=keys.find(k=>/sku|master/i.test(k))||keys[0];
+    const costKey=keys.find(k=>/cost|price|tp|rate/i.test(k)&&!/sku/i.test(k))||keys[1];
+    const sku=String(r[skuKey]||'').trim().split('/')[0].toUpperCase();
+    const cp=fnum(r[costKey]);
+    if(sku&&cp) costMap[sku]=cp;
+  });
+
+  // ── Process Orders
+  let totSaleAmt=0,totQty=0,ordCount=0,cancelCount=0,retCount2=0;
+  const statusCounts={};
+  const orderMap={};
+  const skuOrderMap={};
+
+  order.forEach(r=>{
+    const oid=String(col(r,oOID)||'').trim();
+    const sku=String(col(r,oSKU)||'').trim();
+    const baseSKU=sku.split('/')[0].toUpperCase();
+    const qty=fnum(col(r,oQty)||1);
+    const amt=fnum(col(r,oAmt));
+    const status=String(col(r,oStatus)||'').trim();
+    const statusL=status.toLowerCase();
+    if(/cancel/i.test(statusL)) cancelCount++;
+    else if(/return/i.test(statusL)) retCount2++;
+    else { totSaleAmt+=amt; totQty+=qty; ordCount++; }
+    const sl=status.charAt(0).toUpperCase()+status.slice(1).toLowerCase();
+    statusCounts[sl]=(statusCounts[sl]||0)+1;
+    if(oid) orderMap[oid]={oid,sku,baseSKU,qty,amt,status,date:col(r,oDate),state:col(r,oState)};
+    if(baseSKU){
+      if(!skuOrderMap[baseSKU]) skuOrderMap[baseSKU]={qty:0,amt:0};
+      if(!/cancel/i.test(statusL)&&!/return/i.test(statusL)){
+        skuOrderMap[baseSKU].qty+=qty; skuOrderMap[baseSKU].amt+=amt;
+      }
+    }
+  });
+
+  // ── Process Settlement
+  let totProdSales=0,totAmazonFee=0,totFBAFee=0,totShipFee=0,totNet=0;
+  const settleMap={};
+  const skuSettleMap={};
+
+  settle.forEach(r=>{
+    const oid=String(col(r,sOID)||'').trim();
+    const sku=String(col(r,sSKU)||'').trim();
+    const baseSKU=sku.split('/')[0].toUpperCase();
+    const ps=fnum(col(r,sAmt));
+    const fee=fnum(col(r,sFee));
+    const fba=fnum(col(r,sFBA));
+    const ship=sShip?fnum(col(r,sShip)):0;
+    const net=fnum(col(r,sNet));
+    totProdSales+=ps; totAmazonFee+=fee; totFBAFee+=fba; totShipFee+=ship; totNet+=net;
+    if(oid) settleMap[oid]={oid,sku,baseSKU,ps,fee,fba,ship,net,date:col(r,sDate)};
+    if(baseSKU){
+      if(!skuSettleMap[baseSKU]) skuSettleMap[baseSKU]={ps:0,fee:0,fba:0,net:0};
+      skuSettleMap[baseSKU].ps+=ps; skuSettleMap[baseSKU].fee+=fee;
+      skuSettleMap[baseSKU].fba+=fba; skuSettleMap[baseSKU].net+=net;
+    }
+  });
+
+  // ── Process Returns
+  let totRetAmt=0,totRetQty=0;
+  const retRows=[];
+  const skuRetMap={};
+  returns.forEach(r=>{
+    const oid=String(col(r,'order-id','order_id','Order ID')||'').trim();
+    const sku=String(col(r,'sku','seller-sku','Seller SKU')||'').trim();
+    const baseSKU=sku.split('/')[0].toUpperCase();
+    const qty=fnum(col(r,'quantity','qty','Quantity')||1);
+    const refund=fnum(col(r,'refund','refund-amount','Refund Amount','amount')||0);
+    const reason=col(r,'return-reason','Return Reason','reason')||'';
+    const retDate=col(r,'return-date','Return Date','date')||'';
+    totRetAmt+=Math.abs(refund); totRetQty+=qty;
+    retRows.push({oid,sku,qty,refund,reason,retDate});
+    if(baseSKU){
+      if(!skuRetMap[baseSKU]) skuRetMap[baseSKU]={qty:0,refund:0};
+      skuRetMap[baseSKU].qty+=qty; skuRetMap[baseSKU].refund+=Math.abs(refund);
+    }
+  });
+
+  // ── Process Ads
+  let totAdSpend=0,totAdSales=0,totImpr=0,totClks=0;
+  const adsRows=[];
+  const skuAdsMap={};
+  ads.forEach(r=>{
+    const sku=String(col(r,aSKU)||'').trim();
+    const baseSKU=sku.split('/')[0].toUpperCase();
+    const spend=fnum(col(r,aSpend));
+    const sales=fnum(col(r,aSales));
+    const impr=fnum(col(r,aImp));
+    const clks=fnum(col(r,aClk));
+    const camp=col(r,aCamp)||'';
+    totAdSpend+=spend; totAdSales+=sales; totImpr+=impr; totClks+=clks;
+    adsRows.push({sku,camp,spend,sales,impr,clks,acos:sales?spend/sales*100:0});
+    if(baseSKU){
+      if(!skuAdsMap[baseSKU]) skuAdsMap[baseSKU]={spend:0,sales:0};
+      skuAdsMap[baseSKU].spend+=spend; skuAdsMap[baseSKU].sales+=sales;
+    }
+  });
+
+  // ── Process Coupons
+  let totCouponDisc=0;
+  coupon.forEach(r=>{
+    const disc=fnum(col(r,cDisc));
+    const redem=fnum(col(r,cRedem)||1);
+    totCouponDisc+=disc*redem;
+  });
+  if(totCouponDisc===0&&coupon.length){
+    coupon.forEach(r=>{
+      const vals=Object.values(r).map(v=>fnum(v)).filter(v=>v>0&&v<10000);
+      if(vals.length) totCouponDisc+=Math.min(...vals);
+    });
+  }
+
+  // ── P&L Calculation
+  const totCOGS=Object.keys(skuSettleMap).reduce((sum,sku)=>{
+    const cp=costMap[sku];
+    const qty=(skuOrderMap[sku]?.qty||0);
+    return sum+(cp?cp*qty:0);
+  },0);
+
+  const grossProfit=totNet-totCOGS;
+  const netProfit=grossProfit-totAdSpend-totCouponDisc;
+  const netMargin=totProdSales?netProfit/totProdSales*100:0;
+
+  // ── SKU P&L
+  const allSKUs=[...new Set([...Object.keys(skuOrderMap),...Object.keys(skuSettleMap)])].filter(s=>s);
+  const skuPL=allSKUs.map(sku=>{
+    const ord=skuOrderMap[sku]||{qty:0,amt:0};
+    const set=skuSettleMap[sku]||{ps:0,fee:0,fba:0,net:0};
+    const ret=skuRetMap[sku]||{qty:0,refund:0};
+    const adss=skuAdsMap[sku]||{spend:0,sales:0};
+    const cp=costMap[sku]||null;
+    const cogs=cp?cp*ord.qty:null;
+    const profit=cogs!==null?set.net-cogs-adss.spend:null;
+    const margin=profit!==null&&set.ps?profit/set.ps*100:null;
+    return {sku,qty:ord.qty,saleAmt:ord.amt,ps:set.ps,fee:set.fee,fba:set.fba,
+            net:set.net,retQty:ret.qty,retRefund:ret.refund,
+            adSpend:adss.spend,cp,cogs,profit,margin};
+  }).sort((a,b)=>b.net-a.net);
+
+  // ── Recon: Order vs Settlement
+  const allOIDs=[...new Set([...Object.keys(orderMap),...Object.keys(settleMap)])];
+  const reconRows=allOIDs.map(oid=>{
+    const o=orderMap[oid]; const s=settleMap[oid];
+    const match=o&&s?'Matched ✓':o?'Order Only':'Settlement Only';
+    return {oid,sku:o?.sku||s?.sku||'',status:o?.status||'',date:o?.date||s?.date||'',
+            saleAmt:o?.amt||0,netPayout:s?.net||0,match};
+  });
+
+  DATA={
+    order,settle,returns:retRows,adsRows,skuPL,reconRows,
+    statusCounts,costMap,
+    totSaleAmt,totQty,ordCount,cancelCount,retCount2,
+    totProdSales,totAmazonFee,totFBAFee,totShipFee,totNet,
+    totRetAmt,totRetQty,
+    totAdSpend,totAdSales,totImpr,totClks,totCouponDisc,
+    totCOGS,grossProfit,netProfit,netMargin,
+    hasCost:Object.keys(costMap).length>0,
+    hasAds:ads.length>0, hasCoupon:coupon.length>0, hasRet:returns.length>0
+  };
+
+  document.getElementById('tb-ord').textContent=order.length;
+  document.getElementById('tb-ret').textContent=retRows.length;
+  document.getElementById('tb-ads').textContent=adsRows.length;
+  document.getElementById('tb-recon').textContent=reconRows.filter(r=>r.match==='Matched ✓').length;
+  document.getElementById('hdr-info').textContent=
+    `${order.length} orders · Net ₹${Math.round(totNet).toLocaleString('en-IN')} · Profit ${DATA.hasCost?'₹'+Math.round(netProfit).toLocaleString('en-IN'):'(add cost sheet)'}`;
+
+  document.getElementById('upload-screen').style.display='none';
+  document.getElementById('tool').style.display='block';
+
+  buildPL(); buildOrders(); buildSettle(); buildReturns(); buildAds(); buildSKU(); buildRecon();
+}
+
+// ── P&L SUMMARY ──────────────────────────────────────────────
+function buildPL(){
+  const D=DATA;
+  const sc=D.statusCounts||{};
+
+  const kpis=`<div class="krow">
+    <div class="kc o"><div class="kl">Total Orders</div><div class="kv">${D.order.length.toLocaleString()}</div><div class="ks">All statuses</div></div>
+    <div class="kc g"><div class="kl">Shipped Orders</div><div class="kv">${(D.ordCount).toLocaleString()}</div><div class="ks">Delivered + Shipped</div></div>
+    <div class="kc r"><div class="kl">Cancelled</div><div class="kv">${D.cancelCount.toLocaleString()}</div></div>
+    <div class="kc r"><div class="kl">Returns</div><div class="kv">${D.totRetQty.toLocaleString()}</div><div class="ks">Units returned</div></div>
+    <div class="kc g"><div class="kl">Gross Sale Amt</div><div class="kv" style="font-size:15px">₹${Math.round(D.totProdSales).toLocaleString('en-IN')}</div></div>
+    <div class="kc"><div class="kl">Net Settlement</div><div class="kv" style="font-size:15px">₹${Math.round(D.totNet).toLocaleString('en-IN')}</div></div>
+    ${D.hasAds?`<div class="kc r"><div class="kl">Ads Spend</div><div class="kv" style="font-size:15px">₹${Math.round(D.totAdSpend).toLocaleString('en-IN')}</div><div class="ks">ACOS: ${D.totAdSales?(D.totAdSpend/D.totAdSales*100).toFixed(1)+'%':'—'}</div></div>`:''}
+    ${D.hasCoupon?`<div class="kc r"><div class="kl">Coupon Discount</div><div class="kv" style="font-size:15px">₹${Math.round(D.totCouponDisc).toLocaleString('en-IN')}</div></div>`:''}
+    ${D.hasCost?`<div class="kc r"><div class="kl">Total COGS</div><div class="kv" style="font-size:15px">₹${Math.round(D.totCOGS).toLocaleString('en-IN')}</div></div>`:''}
+    ${D.hasCost?`<div class="kc ${D.netProfit>0?'g':'r'}"><div class="kl">NET PROFIT</div><div class="kv" style="font-size:15px">${inr(D.netProfit)}</div><div class="ks">Margin: ${D.netMargin.toFixed(1)}%</div></div>`:''}
+  </div>`;
+
+  // P&L Waterfall
+  const rows=[
+    {label:'📦 Gross Sale Amount',val:D.totProdSales,cls:'total',dot:'#FF6900'},
+    {label:'🏷️ Amazon Commission / Referral Fee',val:D.totAmazonFee,cls:'deduct',dot:'#dc2626'},
+    {label:'📬 FBA Fulfillment Fee',val:D.totFBAFee,cls:'deduct',dot:'#dc2626'},
+    {label:'🚚 Shipping Fee',val:D.totShipFee,cls:'deduct',dot:'#dc2626'},
+    {label:'💰 Net Settlement (from Amazon)',val:D.totNet,cls:'subtotal',dot:'#16a34a'},
+  ];
+  if(D.hasCost) rows.push({label:'💹 COGS (Cost × Qty)',val:-Math.abs(D.totCOGS),cls:'deduct',dot:'#7C3AED'});
+  if(D.hasAds) rows.push({label:'📢 Ads Spend',val:-Math.abs(D.totAdSpend),cls:'deduct',dot:'#F59E0B'});
+  if(D.hasCoupon) rows.push({label:'🎟️ Coupon Discount',val:-Math.abs(D.totCouponDisc),cls:'deduct',dot:'#0EA5E9'});
+  rows.push({label:'🏆 NET PROFIT / LOSS',val:D.hasCost?D.netProfit:D.totNet,cls:'final',dot:'#fff'});
+
+  const wf=rows.map(r=>`
+    <div class="wf-row ${r.cls}">
+      <div class="wf-label"><div class="wf-dot" style="background:${r.dot}"></div>${r.label}</div>
+      <div style="${r.cls==='final'?'color:#fff;font-size:18px':clr(r.val,r.cls==='deduct')};font-weight:700">${inr(Math.abs(r.val))}${r.cls==='deduct'&&r.val<0?' <span style="font-size:10px;opacity:.7">(deducted)</span>':''}</div>
+    </div>`).join('');
+
+  let alerts='';
+  if(!D.hasCost) alerts+=`<div class="alert al-o">⚠️ Costing sheet upload nahi hua — COGS aur Profit calculate nahi ho sakta. "New Files" se upload karo.</div>`;
+  if(!D.hasAds) alerts+=`<div class="alert al-b">ℹ️ Ads Report nahi dala — Advertising cost P&L mein nahi hai।</div>`;
+  if(D.totNet>0&&D.hasCost) alerts+=`<div class="alert al-g">✅ Net Settlement ₹${Math.round(D.totNet).toLocaleString('en-IN')} | ${D.netProfit>0?'Profit':'Loss'}: ${inr(Math.abs(D.netProfit))} (${D.netMargin.toFixed(1)}% of sales)</div>`;
+
+  document.getElementById('pane-pl').innerHTML=kpis+
+    `<div class="section-hdr">Key Alerts</div><div style="margin-bottom:14px">${alerts||'<div class="alert al-g">✅ All data loaded</div>'}</div>`+
+    `<div class="section-hdr">P&L Waterfall</div><div class="panel"><div class="pb wf">${wf}</div></div>`;
+}
+
+// ── SETTLEMENT DETAIL ─────────────────────────────────────────
+function buildSettle(){
+  const D=DATA;
+  const totFees=Math.abs(D.totAmazonFee)+Math.abs(D.totFBAFee)+Math.abs(D.totShipFee);
+  document.getElementById('pane-settle').innerHTML=`
+    <div class="g2">
+      <div class="panel">
+        <div class="ph">💰 Settlement Breakdown</div>
+        <div class="pb">
+          <div class="srow"><span>Product Sales</span><span class="sg">${inr(D.totProdSales)}</span></div>
+          <div class="srow"><span>Amazon Commission / Referral Fee</span><span class="sr">${inr(D.totAmazonFee)}</span></div>
+          <div class="srow"><span>FBA Fulfillment Fee</span><span class="sr">${inr(D.totFBAFee)}</span></div>
+          <div class="srow"><span>Shipping Fee</span><span class="sr">${inr(D.totShipFee)}</span></div>
+          <div class="srow"><span>Total Fees Deducted</span><span class="sr">-${inr(totFees)}</span></div>
+          <div class="srow"><span>Net Settlement</span><span class="sg" style="font-size:16px">${inr(D.totNet)}</span></div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="ph">📊 Fee Breakdown %</div>
+        <div class="pb" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;padding-top:4px">
+          ${[
+            ['Commission',D.totAmazonFee,'#dc2626'],
+            ['FBA Fee',D.totFBAFee,'#7C3AED'],
+            ['Shipping',D.totShipFee,'#F59E0B'],
+            ['Net Payout %',D.totNet,'#16a34a']
+          ].map(([lbl,val,clr])=>`
+            <div style="text-align:center;padding:10px;background:#F8FAFC;border-radius:8px">
+              <div style="font-size:18px;font-weight:800;color:${clr}">${D.totProdSales?(Math.abs(val)/D.totProdSales*100).toFixed(1):0}%</div>
+              <div style="font-size:10px;color:var(--muted)">${lbl}</div>
+            </div>`).join('')}
+        </div>
+      </div>
+    </div>`;
+}
+
+// ── ORDERS TABLE ──────────────────────────────────────────────
+let ordFiltered=[];
+function buildOrders(){
+  ordFiltered=DATA.order;
+  const oRow=DATA.order[0]||{};
+  const oOID=Object.keys(oRow).find(k=>/order.?id/i.test(k))||'order-id';
+  const oSKU=Object.keys(oRow).find(k=>/sku/i.test(k))||'sku';
+  const oQty=Object.keys(oRow).find(k=>/qty|quantity/i.test(k))||'quantity';
+  const oAmt=Object.keys(oRow).find(k=>/item.?price|amount/i.test(k))||'item-price';
+  const oDate=Object.keys(oRow).find(k=>/purchase|date/i.test(k))||'purchase-date';
+  const oStatus=Object.keys(oRow).find(k=>/status/i.test(k))||'order-status';
+  const oState=Object.keys(oRow).find(k=>/state/i.test(k))||'ship-state';
+
+  document.getElementById('pane-orders').innerHTML=`
+    <div class="tw">
+      <div class="ttb">
+        <input type="text" id="os" placeholder="Search Order ID / SKU..." oninput="filterOrders()">
+        <select id="ost" onchange="filterOrders()">
+          <option value="">All Status</option>
+          ${[...new Set(DATA.order.map(r=>r[oStatus]))].filter(Boolean).map(s=>`<option>${s}</option>`).join('')}
+        </select>
+        <span class="tcnt" id="oc"></span>
+      </div>
+      <div class="ts"><table>
+        <thead><tr><th>Order ID</th><th>SKU</th><th>Qty</th><th>Status</th><th>Date</th><th class="r">Sale Amount</th><th>State</th></tr></thead>
+        <tbody id="ob"></tbody>
+      </table></div>
+      <div class="pgr"><button onclick="pgOrd(-1)" id="op">◀ Prev</button><span id="opg"></span><button onclick="pgOrd(1)" id="on">Next ▶</button></div>
+    </div>`;
+
+  window._oOID=oOID; window._oSKU=oSKU; window._oQty=oQty;
+  window._oAmt=oAmt; window._oDate=oDate; window._oStatus=oStatus; window._oState=oState;
+  renderOrders();
+}
+
+function filterOrders(){
+  const s=(document.getElementById('os')||{}).value?.toLowerCase()||'';
+  const st=(document.getElementById('ost')||{}).value||'';
+  ordFiltered=DATA.order.filter(r=>{
+    const txt=(String(r[window._oOID]||'')+String(r[window._oSKU]||'')).toLowerCase();
+    return (!s||txt.includes(s))&&(!st||r[window._oStatus]===st);
+  });
+  PG.orders=0; renderOrders();
+}
+
+function renderOrders(){
+  const body=document.getElementById('ob'); if(!body) return;
+  const rows=ordFiltered.slice(PG.orders*PER,(PG.orders+1)*PER);
+  body.innerHTML=rows.map(r=>{
+    const status=String(r[window._oStatus]||'');
+    const cls=/ship|deliver/i.test(status)?'bg':/cancel/i.test(status)?'bgr':/return/i.test(status)?'br2':'by';
+    return `<tr>
+      <td style="font-size:10px">${r[window._oOID]||'—'}</td>
+      <td>${r[window._oSKU]||'—'}</td>
+      <td class="c">${r[window._oQty]||'—'}</td>
+      <td>${b(status,cls)}</td>
+      <td>${fmt(r[window._oDate],'date')}</td>
+      <td class="r">${inr(fnum(r[window._oAmt]))}</td>
+      <td>${r[window._oState]||'—'}</td>
+    </tr>`;
+  }).join('');
+  const tot=ordFiltered.length; const pg=PG.orders;
+  (document.getElementById('oc')||{}).textContent=`${tot.toLocaleString()} orders`;
+  (document.getElementById('opg')||{}).textContent=`${pg*PER+1}–${Math.min((pg+1)*PER,tot)} of ${tot}`;
+  (document.getElementById('op')||{}).disabled=pg===0;
+  (document.getElementById('on')||{}).disabled=(pg+1)*PER>=tot;
+}
+function pgOrd(d){PG.orders+=d;renderOrders()}
+
+// ── RETURNS ───────────────────────────────────────────────────
+let retFiltered=[];
+function buildReturns(){
+  retFiltered=DATA.returns;
+  document.getElementById('pane-returns').innerHTML=DATA.returns.length===0?
+    `<div class="alert al-b">ℹ️ Returns Report upload nahi hua।</div>`:`
+    <div class="krow" style="margin-bottom:12px">
+      <div class="kc r"><div class="kl">Return Units</div><div class="kv">${DATA.totRetQty}</div></div>
+      <div class="kc r"><div class="kl">Refund Amount</div><div class="kv" style="font-size:15px">${inr(DATA.totRetAmt)}</div></div>
+    </div>
+    <div class="tw">
+      <div class="ttb">
+        <input type="text" id="rs2" placeholder="Search Order / SKU / Reason..." oninput="filterRet2()">
+        <span class="tcnt" id="rc2"></span>
+      </div>
+      <div class="ts"><table>
+        <thead><tr><th>Order ID</th><th>SKU</th><th class="c">Qty</th><th>Reason</th><th>Return Date</th><th class="r">Refund Amt</th></tr></thead>
+        <tbody id="rb"></tbody>
+      </table></div>
+      <div class="pgr"><button onclick="pgRet2(-1)" id="rp2">◀ Prev</button><span id="rpg2"></span><button onclick="pgRet2(1)" id="rn2">Next ▶</button></div>
+    </div>`;
+  renderRet2();
+}
+function filterRet2(){
+  const s=(document.getElementById('rs2')||{}).value?.toLowerCase()||'';
+  retFiltered=DATA.returns.filter(r=>(r.oid+r.sku+r.reason).toLowerCase().includes(s));
+  PG.returns=0; renderRet2();
+}
+function renderRet2(){
+  const body=document.getElementById('rb'); if(!body) return;
+  const rows=retFiltered.slice(PG.returns*PER,(PG.returns+1)*PER);
+  body.innerHTML=rows.map(r=>`<tr>
+    <td style="font-size:10px">${r.oid}</td><td>${r.sku}</td><td class="c">${r.qty}</td>
+    <td>${r.reason||'—'}</td><td>${fmt(r.retDate,'date')}</td>
+    <td class="r" style="color:var(--red)">${inr(r.refund)}</td>
+  </tr>`).join('');
+  const tot=retFiltered.length; const pg=PG.returns;
+  (document.getElementById('rc2')||{}).textContent=`${tot} returns`;
+  (document.getElementById('rpg2')||{}).textContent=`${pg*PER+1}–${Math.min((pg+1)*PER,tot)} of ${tot}`;
+  (document.getElementById('rp2')||{}).disabled=pg===0;
+  (document.getElementById('rn2')||{}).disabled=(pg+1)*PER>=tot;
+}
+function pgRet2(d){PG.returns+=d;renderRet2()}
+
+// ── ADS ───────────────────────────────────────────────────────
+let adsFiltered=[];
+function buildAds(){
+  adsFiltered=DATA.adsRows;
+  document.getElementById('pane-ads').innerHTML=DATA.adsRows.length===0?
+    `<div class="alert al-b">ℹ️ Ads Report upload nahi hua।</div>`:`
+    <div class="krow" style="margin-bottom:12px">
+      <div class="kc r"><div class="kl">Total Ad Spend</div><div class="kv" style="font-size:15px">${inr(DATA.totAdSpend)}</div></div>
+      <div class="kc g"><div class="kl">Ad Attributed Sales</div><div class="kv" style="font-size:15px">${inr(DATA.totAdSales)}</div></div>
+      <div class="kc gold"><div class="kl">Overall ACOS</div><div class="kv">${DATA.totAdSales?(DATA.totAdSpend/DATA.totAdSales*100).toFixed(1)+'%':'—'}</div></div>
+      <div class="kc"><div class="kl">Total Clicks</div><div class="kv">${DATA.totClks.toLocaleString()}</div></div>
+      <div class="kc"><div class="kl">Impressions</div><div class="kv">${(DATA.totImpr/1000).toFixed(1)}K</div></div>
+    </div>
+    <div class="tw">
+      <div class="ttb">
+        <input type="text" id="as2" placeholder="Search Campaign / SKU..." oninput="filterAds()">
+        <span class="tcnt" id="ac2"></span>
+      </div>
+      <div class="ts"><table>
+        <thead><tr><th>Campaign</th><th>SKU/ASIN</th><th class="r">Spend</th><th class="r">Ad Sales</th><th class="r">ACOS %</th><th class="r">Clicks</th><th class="r">Impressions</th></tr></thead>
+        <tbody id="ab2"></tbody>
+      </table></div>
+      <div class="pgr"><button onclick="pgAds(-1)" id="ap">◀ Prev</button><span id="apg"></span><button onclick="pgAds(1)" id="an">Next ▶</button></div>
+    </div>`;
+  renderAds();
+}
+function filterAds(){
+  const s=(document.getElementById('as2')||{}).value?.toLowerCase()||'';
+  adsFiltered=DATA.adsRows.filter(r=>(r.sku+r.camp).toLowerCase().includes(s));
+  PG.ads=0; renderAds();
+}
+function renderAds(){
+  const body=document.getElementById('ab2'); if(!body) return;
+  const rows=adsFiltered.slice(PG.ads*PER,(PG.ads+1)*PER);
+  body.innerHTML=rows.map(r=>`<tr>
+    <td>${r.camp||'—'}</td><td>${r.sku||'—'}</td>
+    <td class="r" style="color:var(--red)">${inr(r.spend)}</td>
+    <td class="r" style="color:var(--green)">${inr(r.sales)}</td>
+    <td class="r"><b style="color:${r.acos>30?'var(--red)':r.acos>15?'var(--gold)':'var(--green)'}">${r.acos.toFixed(1)}%</b></td>
+    <td class="r">${r.clks.toLocaleString()}</td>
+    <td class="r">${r.impr.toLocaleString()}</td>
+  </tr>`).join('');
+  const tot=adsFiltered.length; const pg=PG.ads;
+  (document.getElementById('ac2')||{}).textContent=`${tot} campaigns`;
+  (document.getElementById('apg')||{}).textContent=`${pg*PER+1}–${Math.min((pg+1)*PER,tot)} of ${tot}`;
+  (document.getElementById('ap')||{}).disabled=pg===0;
+  (document.getElementById('an')||{}).disabled=(pg+1)*PER>=tot;
+}
+function pgAds(d){PG.ads+=d;renderAds()}
+
+// ── SKU P&L ───────────────────────────────────────────────────
+let skuFiltered=[];
+function buildSKU(){
+  skuFiltered=DATA.skuPL;
+  document.getElementById('pane-sku').innerHTML=`
+    <div class="tw">
+      <div class="ttb">
+        <input type="text" id="ss" placeholder="Search SKU..." oninput="filterSKU()">
+        <select id="srt" onchange="sortSKU()">
+          <option value="net">Sort by Net Payout</option>
+          <option value="profit">Sort by Profit</option>
+          <option value="margin">Sort by Margin %</option>
+          <option value="qty">Sort by Qty</option>
+          <option value="spend">Sort by Ad Spend</option>
+        </select>
+        <span class="tcnt" id="sc2"></span>
+      </div>
+      <div class="ts"><table>
+        <thead><tr>
+          <th>SKU</th><th class="r">Qty</th><th class="r">Sale Amt</th>
+          <th class="r">Amazon Fee</th><th class="r">FBA Fee</th><th class="r">Net Payout</th>
+          <th class="r">Ret Units</th><th class="r">Ret Refund</th>
+          <th class="r">Ad Spend</th>
+          <th class="r" style="background:#4A235A">Cost/Unit</th>
+          <th class="r" style="background:#4A235A">COGS</th>
+          <th class="r" style="background:#1A5E2A">Profit</th>
+          <th class="r" style="background:#1A5E2A">Margin%</th>
+        </tr></thead>
+        <tbody id="sb"></tbody>
+      </table></div>
+      <div class="pgr"><button onclick="pgSKU(-1)" id="sp">◀ Prev</button><span id="spg"></span><button onclick="pgSKU(1)" id="sn">Next ▶</button></div>
+    </div>`;
+  renderSKU();
+}
+function filterSKU(){
+  const s=(document.getElementById('ss')||{}).value?.toLowerCase()||'';
+  skuFiltered=DATA.skuPL.filter(r=>r.sku.toLowerCase().includes(s));
+  PG.sku=0; renderSKU();
+}
+function sortSKU(){
+  const by=(document.getElementById('srt')||{}).value||'net';
+  skuFiltered=[...skuFiltered].sort((a,b)=>(b[by]||0)-(a[by]||0));
+  PG.sku=0; renderSKU();
+}
+function renderSKU(){
+  const body=document.getElementById('sb'); if(!body) return;
+  const rows=skuFiltered.slice(PG.sku*PER,(PG.sku+1)*PER);
+  body.innerHTML=rows.map(r=>`<tr>
+    <td style="font-weight:700">${r.sku}</td>
+    <td class="r">${r.qty}</td>
+    <td class="r">${inr(r.saleAmt)}</td>
+    <td class="r" style="color:var(--red)">${inr(r.fee)}</td>
+    <td class="r" style="color:var(--red)">${inr(r.fba)}</td>
+    <td class="r"><b style="color:${r.net>0?'var(--green)':'var(--red)'}">${inr(r.net)}</b></td>
+    <td class="r">${r.retQty||'—'}</td>
+    <td class="r" style="color:var(--red)">${r.retRefund?inr(r.retRefund):'—'}</td>
+    <td class="r" style="color:var(--red)">${r.adSpend?inr(r.adSpend):'—'}</td>
+    <td class="r" style="background:#FFF8E1">${r.cp?inr(r.cp):'<span style="color:#94a3b8;font-size:10px">—</span>'}</td>
+    <td class="r" style="background:#FFF8E1">${r.cogs?'<span style="color:var(--red)">'+inr(r.cogs)+'</span>':'—'}</td>
+    <td class="r">${r.profit!==null?`<b style="color:${r.profit>0?'var(--green)':'var(--red)'}">${inr(Math.abs(r.profit))}</b>`:'—'}</td>
+    <td class="r">${r.margin!==null?`<b style="color:${r.margin>0?'var(--green)':'var(--red)'}">${r.margin.toFixed(1)}%</b>`:'—'}</td>
+  </tr>`).join('');
+  const tot=skuFiltered.length; const pg=PG.sku;
+  (document.getElementById('sc2')||{}).textContent=`${tot} SKUs`;
+  (document.getElementById('spg')||{}).textContent=`${pg*PER+1}–${Math.min((pg+1)*PER,tot)} of ${tot}`;
+  (document.getElementById('sp')||{}).disabled=pg===0;
+  (document.getElementById('sn')||{}).disabled=(pg+1)*PER>=tot;
+}
+function pgSKU(d){PG.sku+=d;renderSKU()}
+
+// ── RECON MATCH ───────────────────────────────────────────────
+let reconFiltered=[];
+function buildRecon(){
+  reconFiltered=DATA.reconRows;
+  document.getElementById('pane-recon').innerHTML=`
+    <div class="krow" style="margin-bottom:12px">
+      <div class="kc g"><div class="kl">Matched</div><div class="kv">${DATA.reconRows.filter(r=>r.match==='Matched ✓').length}</div></div>
+      <div class="kc gold"><div class="kl">Order Only</div><div class="kv">${DATA.reconRows.filter(r=>r.match==='Order Only').length}</div><div class="ks">Not in settlement</div></div>
+      <div class="kc p"><div class="kl">Settlement Only</div><div class="kv">${DATA.reconRows.filter(r=>r.match==='Settlement Only').length}</div></div>
+    </div>
+    <div class="tw">
+      <div class="ttb">
+        <input type="text" id="rcs" placeholder="Search Order ID / SKU..." oninput="filterRecon2()">
+        <select id="rcm" onchange="filterRecon2()">
+          <option value="">All Match</option>
+          <option>Matched ✓</option><option>Order Only</option><option>Settlement Only</option>
+        </select>
+        <span class="tcnt" id="rcc"></span>
+      </div>
+      <div class="ts"><table>
+        <thead><tr><th>Order ID</th><th>SKU</th><th>Status</th><th>Date</th><th class="r">Sale Amt</th><th class="r">Net Payout</th><th>Match</th></tr></thead>
+        <tbody id="rcb"></tbody>
+      </table></div>
+      <div class="pgr"><button onclick="pgRecon2(-1)" id="rcp">◀ Prev</button><span id="rcpg"></span><button onclick="pgRecon2(1)" id="rcn">Next ▶</button></div>
+    </div>`;
+  renderRecon2();
+}
+function filterRecon2(){
+  const s=(document.getElementById('rcs')||{}).value?.toLowerCase()||'';
+  const m=(document.getElementById('rcm')||{}).value||'';
+  reconFiltered=DATA.reconRows.filter(r=>{
+    const txt=(r.oid+r.sku).toLowerCase();
+    return (!s||txt.includes(s))&&(!m||r.match===m);
+  });
+  PG.recon=0; renderRecon2();
+}
+function renderRecon2(){
+  const body=document.getElementById('rcb'); if(!body) return;
+  const rows=reconFiltered.slice(PG.recon*PER,(PG.recon+1)*PER);
+  body.innerHTML=rows.map(r=>{
+    const mc=r.match==='Matched ✓'?'bg':r.match==='Order Only'?'by':'bp';
+    return `<tr>
+      <td style="font-size:10px">${r.oid}</td><td>${r.sku||'—'}</td>
+      <td>${r.status?b(r.status,/ship|deliver/i.test(r.status)?'bg':/cancel/i.test(r.status)?'bgr':'by'):'—'}</td>
+      <td>${fmt(r.date,'date')}</td>
+      <td class="r">${inr(r.saleAmt)}</td>
+      <td class="r" style="color:${r.netPayout>0?'var(--green)':'var(--red)'}">${inr(r.netPayout)}</td>
+      <td>${b(r.match,mc)}</td>
+    </tr>`;
+  }).join('');
+  const tot=reconFiltered.length; const pg=PG.recon;
+  (document.getElementById('rcc')||{}).textContent=`${tot} records`;
+  (document.getElementById('rcpg')||{}).textContent=`${pg*PER+1}–${Math.min((pg+1)*PER,tot)} of ${tot}`;
+  (document.getElementById('rcp')||{}).disabled=pg===0;
+  (document.getElementById('rcn')||{}).disabled=(pg+1)*PER>=tot;
+}
+function pgRecon2(d){PG.recon+=d;renderRecon2()}
+
+function showTab(name,el){
+  document.querySelectorAll('[id^="pane-"]').forEach(p=>p.style.display='none');
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('pane-'+name).style.display='';
+  el.classList.add('active');
+}
+function resetTool(){
+  document.getElementById('tool').style.display='none';
+  document.getElementById('upload-screen').style.display='';
+}
+</script>
+</body>
+</html>
